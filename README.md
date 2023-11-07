@@ -3,6 +3,8 @@
 Automated image tagging
 
 Waiting to see API costs before continuing
+About 2 cents per image, would be over $1000 dollars my images
+Need to wait for lower costs
 
 TODO:
 Need better prompt to control descriptions into a decent format
