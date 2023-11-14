@@ -1,0 +1,13 @@
+# Ignore the Inputs and Outputs folders
+Inputs/
+Outputs/
+
+# Additionally, ignore common file types that are often unnecessary in a repo
+*.log
+*.tmp
+*.temp
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

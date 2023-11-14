@@ -1,68 +1,66 @@
+from fastapi import FastAPI, HTTPException, File, UploadFile
+from pydantic import BaseModel
 import os
 import shutil
 import json
-import openai
 from PIL import Image
 import piexif
-import base64
-import requests
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
-# Function to encode the image and get tags from OpenAI API
-def classify_image(image_path, api_key):
-    # Encode the image to base64
-    base64_image = encode_image(image_path)
-
-    # Headers for the API request
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}"
-    }
-
-    # Payload for the API request
-    payload = {
-        "model": "gpt-4-vision-preview",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "What’s in this image?"},
-                    {"type": "image_url", "image_url": f"data:image/jpeg;base64,{base64_image}"}
-                ],
-            }
-        ],
-        "max_tokens": 300
-    }
-
-    # Make the API request
-    response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-
-    # Handle the response
+def is_ngrok_running():
     try:
-        response_data = response.json()
-        print("API Response:", response_data)  # Debug: Print the full response
-        # Parse the response to get the tags
-        tags_text = response_data['choices'][0]['message']['content']['text']
-        tags = tags_text.split(', ')  # Split tags by comma and space
-        return tags
+        response = requests.get("http://localhost:4040/api/tunnels")
+        return True
+    except:
+        return False
+
+# TODO: ngrok is temporary for development, but it would be good to get this properly working with path, subprocess seems to fail. Fix this or find alternative method for https
+
+
+def start_ngrok():
+    if not is_ngrok_running():
+        subprocess.Popen(
+            "start cmd /k \"C:\\Program Files\\ngrok\\ngrok.exe\" http 8000", shell=True)
+        time.sleep(2)
+
+
+def get_ngrok_url():
+    try:
+        response = requests.get("http://localhost:4040/api/tunnels")
+        data = response.json()
+        public_url = data["tunnels"][0]["public_url"]
+        return public_url
     except Exception as e:
-        print(f"Error processing the response: {e}")
-        return []
+        print(f"An error occurred while fetching ngrok URL: {e}")
+        return None
 
-# Helper function to encode image to base64
-def encode_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
 
+def get_public_ip():
+    try:
+        response = requests.get('https://api.ipify.org?format=json')
+        ip = response.json()['ip']
+        return ip
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Function to embed tags into image metadata
 def embed_metadata(image_path, tags):
     image = Image.open(image_path)
     exif_dict = piexif.load(image.info.get('exif', b''))
-    
-    # Convert tags list to JSON string for embedding
     user_comment = json.dumps(tags)
     exif_dict['Exif'][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(user_comment)
-    
     exif_bytes = piexif.dump(exif_dict)
     image.save(image_path, exif=exif_bytes)
 
@@ -71,36 +69,37 @@ def move_to_output(image_path):
     output_folder = os.path.join('Outputs')
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
-    
     shutil.move(image_path, os.path.join(output_folder, os.path.basename(image_path)))
 
-# Main processing loop for images in the Inputs folder
-def process_images(input_folder, api_key):
-    for image_name in os.listdir(input_folder):
-        image_path = os.path.join(input_folder, image_name)
-        if os.path.isfile(image_path):
-            try:
-                tags = classify_image(image_path, api_key)  # Pass the api_key argument here
-                embed_metadata(image_path, tags)
-                move_to_output(image_path)
-                print(f"Processed and moved: {image_name}")
-            except Exception as e:
-                print(f"Error processing {image_name}: {e}")
+@app.get("/getImage")
+def get_image():
+    input_folder = os.path.join(os.getcwd(), 'Inputs')
+    try:
+        for image_name in os.listdir(input_folder):
+            image_path = os.path.join(input_folder, image_name)
+            if os.path.isfile(image_path):
+                return FileResponse(image_path)
+        raise HTTPException(status_code=404, detail="No images found in the Inputs folder")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-# Define the root, input, and output folders
-root_folder = os.getcwd()
-input_folder = os.path.join(root_folder, 'Inputs')
+class TagList(BaseModel):
+    tags: list[str]
 
-# Retrieve API key from environment variable
-api_key = os.getenv('OPENAI_API_KEY')  # Make sure the environment variable is set
+@app.post("/embedTags")
+async def embed_tags(tags: TagList, file: UploadFile = File(...)):
+    try:
+        input_folder = os.path.join(os.getcwd(), 'Inputs')
+        input_image_path = os.path.join(input_folder, file.filename)
 
-# Check if the API key is available
-if api_key:
-    # Process all images in the Inputs folder
-    process_images(input_folder, api_key)
-else:
-    print("API key not found. Please set the OPENAI_API_KEY environment variable.")
+        # Save the uploaded file to the Inputs folder
+        with open(input_image_path, 'wb') as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
+        # Embed metadata and move the file to the Outputs folder
+        embed_metadata(input_image_path, tags.tags)
+        move_to_output(input_image_path)
 
-# Process all images in the Inputs folder
-process_images(input_folder,api_key)
+        return {"status": f"Tags embedded and {file.filename} moved to Outputs folder"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
