@@ -120,7 +120,3 @@ if api_key:
     process_images(input_folder, api_key)
 else:
     print("API key not found. Please set the OPENAI_API_KEY environment variable.")
-
-
-# Process all images in the Inputs folder
-process_images(input_folder,api_key)
