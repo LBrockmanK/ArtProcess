@@ -16,7 +16,7 @@ image_folder = "Inputs"
 tags = ["Male", "Female", "Animal", "Blue"]  # List of tags
 
 # Create a prompt with available tags
-prompt = f"Question: Which of these tags apply to the image [{', '.join(tags)}]? Answer:"
+prompt = f"Question: Which of these tags apply to the image [{', '.join(tags)}]? Answer: ["
 print(f"Prompt: {prompt}")
 
 for image_name in os.listdir(image_folder):
