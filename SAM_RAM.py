@@ -4,7 +4,7 @@
 # download RAM and Tag2Text checkpoints to ./pretrained/ from https://github.com/majinyu666/recognize-anything/tree/main#toolbox-checkpoints
 # download GroundingDINO and SAM checkpoints to ./Grounded-Segment-Anything/ from step 1 of https://github.com/IDEA-Research/Grounded-Segment-Anything#running_man-grounded-sam-detect-and-segment-everything-with-text-prompt
 config_file = "C:/Users/cpnbe/Documents/Grounded-Segment-Anything/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
-ram_checkpoint = "C:/Users/cpnbe/Documents/image_classification_models/ram_swin_large_14m.pth"
+ram_checkpoint = "C:/Users/cpnbe/Documents/image_classification_models/ram_plus_swin_large_14m.pth"
 tag2text_checkpoint = "C:/Users/cpnbe/Documents/image_classification_models/tag2text_swin_14m.pth"
 grounded_checkpoint = "C:/Users/cpnbe/Documents/image_classification_models/groundingdino_swint_ogc.pth"
 sam_checkpoint = "C:/Users/cpnbe/Documents/image_classification_models/sam_vit_h_4b8939.pth"
@@ -31,7 +31,7 @@ from groundingdino.util.utils import clean_state_dict, get_phrases_from_posmap
 from PIL import Image, ImageDraw, ImageFont
 from ram import inference_ram
 from ram import inference_tag2text
-from ram.models import ram
+from ram.models import ram_plus
 from ram.models import tag2text
 from segment_anything import SamPredictor, build_sam
 
@@ -226,7 +226,7 @@ def inference(
     # load 4 models
 
 # load RAM
-ram_model = ram(pretrained=ram_checkpoint, image_size=384, vit='swin_l')
+ram_model = ram_plus(pretrained=ram_checkpoint, image_size=384, vit='swin_l')
 ram_model.eval()
 ram_model = ram_model.to(device)
 

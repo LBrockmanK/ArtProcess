@@ -1,0 +1,1 @@
+# For each type of category, if none are applied add an "Other" label?
